@@ -12,35 +12,56 @@ All repo code can be run on WSL Ubuntu24.04 with Windows11
 sudo apt update
 sudo apt install -y build-essential cmake ninja-build libgtest-dev python3 python3-pip
 
-python3 -m pip install torch --index-url https://download.pytorch.org/whl/cu131
+python3 -m venv .venv
+source .venv/bin/activate
+pip install torch --index-url https://download.pytorch.org/whl/cu131
+```
 
-TORCH_INC=$(python3 - <<'PY'
-import torch
+## How to build
+
+```bash
+cd /mnt/c/Users/xincu/cuInferenceEngine
+
+TORCH_INC=$(python - <<'PY'
 from torch.utils.cpp_extension import include_paths
 print(" ".join(f"-I{x}" for x in include_paths()))
 PY
 )
 
-TORCH_LIB=$(python3 - <<'PY'
+TORCH_LIB=$(python - <<'PY'
 import torch, os
 print(os.path.join(os.path.dirname(torch.__file__), "lib"))
 PY
 )
 ```
-
-## How to run kernel operators
+```bash
+you can find the NVIDIA ARCH Info with the cmd following as
+nvidia-smi --query-gpu=compute_cap --format=csv
+```
 
 ```bash
 nvcc -x cu -std=c++17 -O3 -arch=sm_89 \
   cuRmsNormCUDATest.cpp \
   -I. -I/usr/include \
-  -I/mnt/c/Users/admin/cuixin/DeepSeek-V4-Flash/.venv311/lib/python3.11/site-packages/torch/include \
-  -I/mnt/c/Users/admin/cuixin/DeepSeek-V4-Flash/.venv311/lib/python3.11/site-packages/torch/include/torch/csrc/api/include \
-  -L/mnt/c/Users/admin/cuixin/DeepSeek-V4-Flash/.venv311/lib/python3.11/site-packages/torch/lib \
+  $TORCH_INC \
+  -L"$TORCH_LIB" \
   -L/usr/lib/x86_64-linux-gnu \
-  -ltorch -ltorch_cpu -lc10 -lgtest -lgtest_main -lpthread \
+  -ltorch_cpu -lc10 -lgtest -lgtest_main -lpthread \
   -o cuRmsNormCUDATest
-
-export LD_LIBRARY_PATH=/mnt/c/Users/admin/cuixin/DeepSeek-V4-Flash/.venv311/lib/python3.11/site-packages/torch/lib:$LD_LIBRARY_PATH
-./cuRmsNormCUDATest --gtest_filter=brRmsNormCUDAKernelTest.sanity
 ```
+
+## How to run
+
+```bash
+export LD_LIBRARY_PATH="$TORCH_LIB:$LD_LIBRARY_PATH"
+
+# run sanity test
+./cuRmsNormCUDATest --gtest_filter=brRmsNormCUDAKernelTest.sanity
+
+# run regression test
+./cuRmsNormCUDATest --gtest_filter=brRmsNormCUDAKernelTest.regression
+
+# run perf test
+./cuRmsNormCUDATest --gtest_filter=brRmsNormCUDAKernelTest.perf
+```
+
