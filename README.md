@@ -17,7 +17,38 @@ source .venv/bin/activate
 pip install torch --index-url https://download.pytorch.org/whl/cu131
 ```
 
-## How to build
+## How to build cuReorderTest (no PyTorch)
+
+`cuReorderTest.cpp` is a self-contained CUDA + GTest binary (uses CUB from the CUDA toolkit).
+
+```bash
+cd /mnt/c/Users/xincu/cuInferenceEngine
+
+# Query GPU compute capability, then set -arch=sm_XX accordingly (example: 8.9 -> sm_89)
+nvidia-smi --query-gpu=compute_cap --format=csv
+
+nvcc -x cu -std=c++17 -O3 -arch=sm_89 \
+  cuReorderTest.cpp \
+  -I. -I/usr/include \
+  -lgtest -lgtest_main -lpthread \
+  -o cuReorderTest
+```
+
+## How to run cuReorderTest
+
+```bash
+# run all reorder tests
+./cuReorderTest
+
+# run a single test
+./cuReorderTest --gtest_filter=ReorderCUDATest.uma_roundtrip
+./cuReorderTest --gtest_filter=ReorderCUDATest.fold_roundtrip
+./cuReorderTest --gtest_filter=ReorderCUDATest.last_token_extract
+./cuReorderTest --gtest_filter=ReorderCUDATest.multi_segment_roundtrip
+./cuReorderTest --gtest_filter=ReorderCUDATest.large_roundtrip
+```
+
+## How to build cuRmsNormCUDATest (requires PyTorch)
 
 ```bash
 cd /mnt/c/Users/xincu/cuInferenceEngine
@@ -50,7 +81,7 @@ nvcc -x cu -std=c++17 -O3 -arch=sm_89 \
   -o cuRmsNormCUDATest
 ```
 
-## How to run
+## How to run cuRmsNormCUDATest
 
 ```bash
 export LD_LIBRARY_PATH="$TORCH_LIB:$LD_LIBRARY_PATH"
