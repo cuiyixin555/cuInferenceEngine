@@ -405,9 +405,9 @@ __global__ void ReorderMultiSegmentToDenseKernel(
 
           __nv_bfloat16 items[ITEMS_PER_THREAD];
 
-          int64_t src_offset =
-              (int64_t)w_split_idx * fold_N * fold_H * fold_W +
-              (int64_t)n_src * fold_H * fold_W + h * fold_W + w_tile;
+          int64_t src_offset = (int64_t)w_split_idx * fold_N * fold_H * fold_W +
+                               (int64_t)n_src * fold_H * fold_W + h * fold_W +
+                               w_tile;
 
           if (valid == TILE_W) {
             BlockLoadT(load_temp).Load(src + src_offset, items);
@@ -896,7 +896,8 @@ static bool test_large_reorder_cuda() {
         }
       }
     }
-    printf("%s (mismatches: %d/%zu)\n", pass ? "PASS" : "FAIL", mismatch_count, ori_elems);
+    printf("%s (mismatches: %d/%zu)\n", pass ? "PASS" : "FAIL", mismatch_count,
+           ori_elems);
     all_pass = all_pass && pass;
 
     cudaFree(d_dense);
@@ -910,13 +911,9 @@ static bool test_large_reorder_cuda() {
 // GTest Registrations
 // ============================================================================
 
-TEST(ReorderCUDATest, uma_roundtrip) {
-  EXPECT_TRUE(test_uma_reorder_cuda());
-}
+TEST(ReorderCUDATest, uma_roundtrip) { EXPECT_TRUE(test_uma_reorder_cuda()); }
 
-TEST(ReorderCUDATest, fold_roundtrip) {
-  EXPECT_TRUE(test_fold_reorder_cuda());
-}
+TEST(ReorderCUDATest, fold_roundtrip) { EXPECT_TRUE(test_fold_reorder_cuda()); }
 
 TEST(ReorderCUDATest, last_token_extract) {
   EXPECT_TRUE(test_last_token_reorder_cuda());

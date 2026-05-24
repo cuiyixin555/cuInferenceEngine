@@ -34,6 +34,18 @@ nvcc -x cu -std=c++17 -O3 -arch=sm_89 \
   -o cuReorderTest
 ```
 
+## How to build cuDeepSeekUnPermutationCUDATest
+
+`cuDeepSeekUnPermutationCUDATest.cpp` is a self-contained CUDA + GTest binary
+
+```bash
+nvcc -x cu -std=c++17 -O3 -arch=sm_89 \
+  cuDeepSeekUnPermutationCUDATest.cpp \
+  -I. -I/usr/include \
+  -lgtest -lgtest_main -lpthread \
+  -o cuDeepSeekUnPermutationCUDATest
+```
+
 ## How to run cuReorderTest
 
 ```bash
@@ -46,6 +58,11 @@ nvcc -x cu -std=c++17 -O3 -arch=sm_89 \
 ./cuReorderTest --gtest_filter=ReorderCUDATest.last_token_extract
 ./cuReorderTest --gtest_filter=ReorderCUDATest.multi_segment_roundtrip
 ./cuReorderTest --gtest_filter=ReorderCUDATest.large_roundtrip
+```
+
+## How to run cuDeepSeekUnPermutationCUDATest
+```bash
+./cuDeepSeekUnPermutationCUDATest
 ```
 
 ## How to build cuRmsNormCUDATest (requires PyTorch)
