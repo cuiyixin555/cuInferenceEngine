@@ -112,8 +112,9 @@ run_nvcc() {
   nvcc "${nvcc_args[@]}" "$@"
 }
 
-build_torch_split() {
+build_cuda_split() {
   local kernel_cu="$1"
+  local use_torch="$2"
   local obj_dir="${TMPDIR:-/tmp/cuInferenceEngine-build}/$BASENAME"
   mkdir -p "$obj_dir"
 
@@ -123,19 +124,27 @@ build_torch_split() {
   local host_obj="$obj_dir/${BASENAME}.o"
   local kernel_obj="$obj_dir/$(basename "$kernel_cu" .cu).o"
 
-  local torch_cxx_abi
-  torch_cxx_abi="$("$PYTHON" - <<'PY'
+  local cxx_flags=(-std=c++17 -O3 -fPIC)
+  local nvcc_host_flags=(-Xcompiler -std=c++17 -Xcompiler -fPIC)
+  local link_libs=(-L"$cuda_root/lib64" -L/usr/lib/x86_64-linux-gnu
+    -lcudart -lgtest -lgtest_main -lpthread)
+
+  if [[ "$use_torch" == "1" ]]; then
+    local torch_cxx_abi
+    torch_cxx_abi="$("$PYTHON" - <<'PY'
 import torch
 print(int(torch._C._GLIBCXX_USE_CXX11_ABI))
 PY
 )"
-
-  local cxx_flags=(-std=c++17 -O3 -fPIC "-D_GLIBCXX_USE_CXX11_ABI=${torch_cxx_abi}")
-  local nvcc_host_flags=(-Xcompiler -std=c++17 -Xcompiler -fPIC
-    "-Xcompiler=-D_GLIBCXX_USE_CXX11_ABI=${torch_cxx_abi}")
+    cxx_flags+=("-D_GLIBCXX_USE_CXX11_ABI=${torch_cxx_abi}")
+    nvcc_host_flags+=("-Xcompiler=-D_GLIBCXX_USE_CXX11_ABI=${torch_cxx_abi}")
+    link_libs=(-L"$TORCH_LIB" "${link_libs[@]}" -ltorch_cpu -ltorch -lc10)
+    echo "  mode   : split build (g++ for PyTorch host code, nvcc for CUDA kernel)"
+  else
+    echo "  mode   : split build (g++ for host code, nvcc for CUDA kernel)"
+  fi
 
   echo "  kernel : $kernel_cu"
-  echo "  mode   : split build (g++ for PyTorch host code, nvcc for CUDA kernel)"
 
   export TMPDIR="${TMPDIR:-/tmp/cuInferenceEngine-build}"
   mkdir -p "$TMPDIR"
@@ -144,15 +153,11 @@ PY
   nvcc -objtemp "${NVCC_FLAGS[@]}" "${nvcc_host_flags[@]}" -c "$kernel_cu" \
     "${INCLUDES[@]}" -o "$kernel_obj"
 
-  echo "  step 2 : g++ compiling test (with PyTorch headers)..."
+  echo "  step 2 : g++ compiling test..."
   g++ "${cxx_flags[@]}" -c "$SRC" "${host_includes[@]}" -o "$host_obj"
 
   echo "  step 3 : linking..."
-  g++ "${cxx_flags[@]}" "$host_obj" "$kernel_obj" \
-    -L"$TORCH_LIB" -L"$cuda_root/lib64" -L/usr/lib/x86_64-linux-gnu \
-    -ltorch_cpu -ltorch -lc10 -lcudart \
-    -lgtest -lgtest_main -lpthread \
-    -o "$OUT"
+  g++ "${cxx_flags[@]}" "$host_obj" "$kernel_obj" "${link_libs[@]}" -o "$OUT"
 }
 
 [[ $# -eq 1 ]] || usage
@@ -213,7 +218,7 @@ PY
 
   KERNEL_CU="$(find_kernel_cu || true)"
   if [[ -n "$KERNEL_CU" ]]; then
-    build_torch_split "$KERNEL_CU"
+    build_cuda_split "$KERNEL_CU" 1
   else
     echo "  warning: no kernel/${BASENAME%Test}Kernel.cu found; falling back to single nvcc build"
     run_nvcc 1 "${NVCC_FLAGS[@]}" "$SRC" "${INCLUDES[@]}" "${LIBS[@]}" -o "$OUT"
@@ -225,7 +230,12 @@ PY
   echo "  export LD_LIBRARY_PATH=\"$TORCH_LIB:\$LD_LIBRARY_PATH\""
   echo "  $OUT"
 else
-  run_nvcc 0 "${NVCC_FLAGS[@]}" "$SRC" "${INCLUDES[@]}" "${LIBS[@]}" -o "$OUT"
+  KERNEL_CU="$(find_kernel_cu || true)"
+  if [[ -n "$KERNEL_CU" ]]; then
+    build_cuda_split "$KERNEL_CU" 0
+  else
+    run_nvcc 0 "${NVCC_FLAGS[@]}" "$SRC" "${INCLUDES[@]}" "${LIBS[@]}" -o "$OUT"
+  fi
 
   echo
   echo "Built: $OUT"
