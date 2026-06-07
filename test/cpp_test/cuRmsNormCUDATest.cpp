@@ -20,7 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "cuRmsNormCUDAKernel.h"
+#include "cuRmsNormCUDAKernel_launch.h"
 #include "gtest/gtest.h"
 #include <cmath>
 #include <cstdio>

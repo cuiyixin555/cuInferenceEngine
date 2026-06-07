@@ -68,6 +68,50 @@ Query GPU compute capability manually:
 nvidia-smi --query-gpu=compute_cap --format=csv
 ```
 
+### Build error: `List_inl.h: need 'typename' before 'decltype'`
+
+PyTorch headers cannot be compiled by `nvcc` in a single translation unit. For
+tests that include `torch/torch.h`, `make.sh` automatically uses **split build**:
+
+1. `nvcc` compiles `kernel/<name>Kernel.cu` (CUDA kernel only)
+2. `g++` compiles the test `.cpp` (PyTorch host code)
+3. `g++` links both objects
+
+For `cuRmsNormCUDATest`, ensure `kernel/cuRmsNormCUDAKernel.cu` exists and run:
+
+```bash
+./make.sh test/cpp_test/cuRmsNormCUDATest.cpp
+```
+
+### Build seems stuck on cuRmsNormCUDATest?
+
+This is usually **not a hang**. After printing `arch : sm_89`, `nvcc` is compiling
+`#include <torch/torch.h>`, which pulls in a very large header tree. The first
+build often takes **10–20 minutes** with no further output.
+
+Try:
+
+```bash
+# show nvcc progress
+VERBOSE=1 ./make.sh test/cpp_test/cuRmsNormCUDATest.cpp
+
+# put nvcc temp files on Linux native FS (recommended on WSL)
+TMPDIR=/tmp/cuInferenceEngine-build ./make.sh test/cpp_test/cuRmsNormCUDATest.cpp
+```
+
+If the repo lives under `/mnt/c/` (Windows mount on WSL), compilation can be
+**much slower** than on the Linux filesystem. For daily development, clone to
+`~/cuInferenceEngine` instead.
+
+While waiting, you can confirm `nvcc` is working in another terminal:
+
+```bash
+ps aux | grep nvcc
+top -p $(pgrep -n nvcc)
+```
+
+If CPU usage stays high, compilation is still in progress—please wait.
+
 ## How to run
 
 ### cuReorderTest
